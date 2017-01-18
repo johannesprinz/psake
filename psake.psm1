@@ -626,7 +626,9 @@ function ConfigureBuildEnvironment {
             }
         }
     }
-    $frameworkDirs = $frameworkDirs + @($versions | foreach { "$env:windir\Microsoft.NET\$bitness\$_\" })
+    if($null -ne $env:windir) {
+        $frameworkDirs = $frameworkDirs + @($versions | foreach { "$env:windir\Microsoft.NET\$bitness\$_\" })
+    }
 
     for ($i = 0; $i -lt $frameworkDirs.Count; $i++) {
         $dir = $frameworkDirs[$i]
