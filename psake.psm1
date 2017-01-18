@@ -68,7 +68,7 @@ function Invoke-Task
         if ($taskKey -ne 'default') {
 
             if ($task.PreAction -or $task.PostAction) {
-                Assert ($task.Action -ne $null) ($msgs.error_missing_action_parameter -f $taskName)
+                Assert ($null -ne $task.Action) ($msgs.error_missing_action_parameter -f $taskName)
             }
 
             if ($task.Action) {
@@ -93,7 +93,7 @@ function Invoke-Task
                     }
 
                     foreach ($variable in $task.requiredVariables) {
-                        Assert ((test-path "variable:$variable") -and ((get-variable $variable).Value -ne $null)) ($msgs.required_variable_not_set -f $variable, $taskName)
+                        Assert ((test-path "variable:$variable") -and ($null -ne (get-variable $variable).Value)) ($msgs.required_variable_not_set -f $variable, $taskName)
                     }
 
                     & $task.Action
@@ -163,7 +163,7 @@ function Exec
                 throw $_
             }
 
-            if ($retryTriggerErrorPattern -ne $null) {
+            if ($null -ne $retryTriggerErrorPattern) {
                 $isMatch = [regex]::IsMatch($_.Exception.Message, $retryTriggerErrorPattern)
 
                 if ($isMatch -eq $false) {
@@ -171,7 +171,7 @@ function Exec
                 }
             }
 
-            Write-Host "Try $tryCount failed, retrying again in 1 second..."
+            Write-Information "Try $tryCount failed, retrying again in 1 second..." -InformationAction Continue
 
             $tryCount++
 
@@ -455,7 +455,7 @@ function WriteColoredOutput {
 
     $currentConfig = GetCurrentConfigurationOrDefault
     if ($currentConfig.coloredOutput -eq $true) {
-        if (($Host.UI -ne $null) -and ($Host.UI.RawUI -ne $null) -and ($Host.UI.RawUI.ForegroundColor -ne $null)) {
+        if (($null -ne $Host.UI) -and ($null -ne $Host.UI.RawUI) -and ($null -ne $Host.UI.RawUI.ForegroundColor)) {
             $previousColor = $Host.UI.RawUI.ForegroundColor
             $Host.UI.RawUI.ForegroundColor = $foregroundcolor
         }
@@ -463,7 +463,7 @@ function WriteColoredOutput {
 
     $message
 
-    if ($previousColor -ne $null) {
+    if ($null -ne $previousColor) {
         $Host.UI.RawUI.ForegroundColor = $previousColor
     }
 }
@@ -476,8 +476,8 @@ function LoadModules {
 
         $global = [string]::Equals($scope, "global", [StringComparison]::CurrentCultureIgnoreCase)
 
-        $currentConfig.modules | foreach {
-            resolve-path $_ | foreach {
+        $currentConfig.modules | ForEach-Object {
+            resolve-path $_ | ForEach-Object {
                 "Loading module: $_"
                 $module = import-module $_ -passthru -DisableNameChecking -global:$global
                 if (!$module) {
@@ -619,15 +619,15 @@ function ConfigureBuildEnvironment {
         }
     }
     $frameworkDirs = @()
-    if ($buildToolsVersions -ne $null) {
-        foreach($ver in $buildToolsVersions) {
+    if ($null -ne $buildToolsVersions) {
+        ForEach($ver in $buildToolsVersions) {
             if (Test-Path "HKLM:\SOFTWARE\Microsoft\MSBuild\ToolsVersions\$ver") {
                 $frameworkDirs += (Get-ItemProperty -Path "HKLM:\SOFTWARE\Microsoft\MSBuild\ToolsVersions\$ver" -Name $buildToolsKey).$buildToolsKey
             }
         }
     }
     if($null -ne $env:windir) {
-        $frameworkDirs = $frameworkDirs + @($versions | foreach { "$env:windir\Microsoft.NET\$bitness\$_\" })
+        $frameworkDirs = $frameworkDirs + @($versions | ForEach-Object { "$env:windir\Microsoft.NET\$bitness\$_\" })
     }
 
     for ($i = 0; $i -lt $frameworkDirs.Count; $i++) {
@@ -640,7 +640,7 @@ function ConfigureBuildEnvironment {
         }
     }
 
-    $frameworkDirs | foreach { Assert (test-path $_ -pathType Container) ($msgs.error_no_framework_install_dir_found -f $_)}
+    $frameworkDirs | ForEach-Object { Assert (test-path $_ -pathType Container) ($msgs.error_no_framework_install_dir_found -f $_)}
 
     $env:path = ($frameworkDirs -join ";") + ";$env:path"
     # if any error occurs in a PS function then "stop" processing immediately
@@ -722,7 +722,7 @@ function SelectObjectWithDefault
     )
 
     process {
-        if ($_ -eq $null) { $Value }
+        if ($null -eq $_) { $Value }
         elseif ($_ | Get-Member -Name $Name) {
           $_.$Name
         }
@@ -737,6 +737,7 @@ function SelectObjectWithDefault
 # modified to better handle SQL errors
 function ResolveError
 {
+    [OutputType([String])]
     [CmdletBinding()]
     param(
         [Parameter(ValueFromPipeline=$true)]
@@ -746,7 +747,7 @@ function ResolveError
     )
 
     process {
-        if ($_ -eq $null) { $_ = $ErrorRecord }
+        if ($null -eq $_) { $_ = $ErrorRecord }
         $ex = $_.Exception
 
         if (-not $Short) {
@@ -756,7 +757,7 @@ function ResolveError
             $formatted_exception = ''
 
             $i = 0
-            while ($ex -ne $null) {
+            while ($null -ne $ex) {
                 $i++
                 $formatted_exception += ("$i" * 70) + "`n" +
                     ($ex | format-list * -force | out-string) + "`n"
@@ -767,7 +768,7 @@ function ResolveError
         }
 
         $lastException = @()
-        while ($ex -ne $null) {
+        while ($null -ne $ex) {
             $lastMessage = $ex | SelectObjectWithDefault -Name 'Message' -Value ''
             $lastException += ($lastMessage -replace "`n", '')
             if ($ex -is [Data.SqlClient.SqlException]) {
@@ -785,8 +786,8 @@ function ResolveError
             SelectObjectWithDefault -Name 'PositionMessage' -Value '') -replace "`n", ' '),
             ($_ | SelectObjectWithDefault -Name 'Message' -Value ''),
             ($_ | SelectObjectWithDefault -Name 'Exception' -Value '') |
-                ? { -not [String]::IsNullOrEmpty($_) } |
-                Select -First 1
+                Where-Object { -not [String]::IsNullOrEmpty($_) } |
+                Select-Object -First 1
 
         $delimiter = ''
         if ((-not [String]::IsNullOrEmpty($header)) -and
@@ -824,8 +825,8 @@ function WriteDocumentation($showDetailed) {
     }
     
     $docs = GetTasksFromContext $currentContext | 
-                Where   {$_.Name -ne 'default'} | 
-                ForEach {
+                Where-Object   {$_.Name -ne 'default'} | 
+                ForEach-Object {
                     $isDefault = $null
                     if ($defaultTaskDependencies -contains $_.Name) { 
                         $isDefault = $true 
@@ -834,9 +835,9 @@ function WriteDocumentation($showDetailed) {
                 }
 
     if ($showDetailed) {
-        $docs | sort 'Name' | format-list -property Name,Alias,Description,@{Label="Depends On";Expression={$_.DependsOn -join ', '}},Default
+        $docs | Sort-Object 'Name' | format-list -property Name,Alias,Description,@{Label="Depends On";Expression={$_.DependsOn -join ', '}},Default
     } else {
-        $docs | sort 'Name' | format-table -autoSize -wrap -property Name,Alias,@{Label="Depends On";Expression={$_.DependsOn -join ', '}},Default,Description
+        $docs | Sort-Object 'Name' | format-table -autoSize -wrap -property Name,Alias,@{Label="Depends On";Expression={$_.DependsOn -join ', '}},Default,Description
     }
 }
 
